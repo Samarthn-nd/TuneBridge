@@ -3,4 +3,6 @@ plugins { id("com.facebook.react.settings") }
 extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autolinkLibrariesFromCommand() }
 rootProject.name = 'TuneBridge'
 include ':app'
+include ':shared'
+project(':shared').projectDir = new File(rootProject.projectDir, '../tune-shared')
 includeBuild('../node_modules/@react-native/gradle-plugin')

@@ -27,6 +27,7 @@ type Track = {
   id: string;
   title: string;
   artist: string;
+  previewUrl: string;
 };
 
 type PlayerStatus = {
@@ -81,7 +82,7 @@ function AppContent() {
     try {
       setCurrentTrack(track);
       setShowPlayer(true);
-      const result = await MusicNativeModule.play();
+      const result = await MusicNativeModule.play(track);
       setPlayerStatus(prev => ({ ...prev, isPlaying: result.isPlaying }));
     } catch (e) {
       console.error('Failed to play track:', e);
@@ -95,7 +96,7 @@ function AppContent() {
         const result = await MusicNativeModule.pause();
         setPlayerStatus(prev => ({ ...prev, isPlaying: result.isPlaying }));
       } else {
-        const result = await MusicNativeModule.play();
+        const result = await MusicNativeModule.resume();
         setPlayerStatus(prev => ({ ...prev, isPlaying: result.isPlaying }));
       }
     } catch (e) {

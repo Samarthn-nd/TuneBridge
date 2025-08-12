@@ -3,6 +3,7 @@ package com.tunebridge
 import com.facebook.react.bridge.*
 import com.tunebridge.shared.MusicController
 import com.tunebridge.shared.MusicApi
+import com.tunebridge.shared.Track
 import kotlinx.coroutines.*
 import kotlinx.coroutines.Dispatchers.IO
 
@@ -17,14 +18,18 @@ class MusicNativeModule(reactContext: ReactApplicationContext) :
     fun searchMusic(query: String, promise: Promise) {
         CoroutineScope(IO).launch {
             try {
+                println("Native Module: Starting search for: $query")
                 val tracks = MusicApi.searchSongs(query)
+                println("Native Module: Got ${tracks.size} tracks from API")
                 val trackArray = Arguments.createArray()
                 
                 for (track in tracks) {
+                    println("Native Module: Adding track: ${track.title} by ${track.artist}")
                     val trackMap = Arguments.createMap()
                     trackMap.putString("id", track.id)
                     trackMap.putString("title", track.title)
                     trackMap.putString("artist", track.artist)
+                    trackMap.putString("previewUrl", track.previewUrl)
                     trackArray.pushMap(trackMap)
                 }
                 
@@ -32,6 +37,7 @@ class MusicNativeModule(reactContext: ReactApplicationContext) :
                     promise.resolve(trackArray)
                 }
             } catch (e: Exception) {
+                println("Native Module: Search error: ${e.message}")
                 withContext(Dispatchers.Main) {
                     promise.reject("SEARCH_ERROR", e.message)
                 }
@@ -40,9 +46,30 @@ class MusicNativeModule(reactContext: ReactApplicationContext) :
     }
     
     @ReactMethod
-    fun play(promise: Promise) {
+    fun play(trackData: ReadableMap, promise: Promise) {
         try {
-            musicController.play()
+            val track = Track(
+                id = trackData.getString("id")!!,
+                title = trackData.getString("title")!!,
+                artist = trackData.getString("artist")!!,
+                previewUrl = trackData.getString("previewUrl")!!
+            )
+            println("Native Module: Playing track: ${track.title} with URL: ${track.previewUrl}")
+            musicController.play(track)
+            val result = Arguments.createMap()
+            result.putBoolean("isPlaying", musicController.isPlaying)
+            println("Native Module: Play result - isPlaying: ${musicController.isPlaying}")
+            promise.resolve(result)
+        } catch (e: Exception) {
+            println("Native Module: Play error: ${e.message}")
+            promise.reject("PLAY_ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun resume(promise: Promise) {
+        try {
+            musicController.resume()
             val result = Arguments.createMap()
             result.putBoolean("isPlaying", musicController.isPlaying)
             promise.resolve(result)
@@ -91,8 +118,9 @@ class MusicNativeModule(reactContext: ReactApplicationContext) :
     fun getStatus(promise: Promise) {
         try {
             val result = Arguments.createMap()
-            result.putBoolean("isPlaying", musicController.isPlaying)
-            result.putInt("volume", musicController.volume)
+            val status = musicController.getStatus()
+            result.putBoolean("isPlaying", status.isPlaying)
+            result.putInt("volume", status.volume)
             promise.resolve(result)
         } catch (e: Exception) {
             promise.reject("STATUS_ERROR", e.message)

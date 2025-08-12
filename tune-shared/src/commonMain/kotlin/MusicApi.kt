@@ -10,55 +10,74 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 @Serializable
-data class Track(val id: String, val title: String, val artist: String)
+data class Track(val id: String, val title: String, val artist: String, val previewUrl: String)
+
+@Serializable
+data class ITunesTrack(
+    val trackId: Long,
+    val trackName: String,
+    val artistName: String,
+    val previewUrl: String = ""
+)
+
+@Serializable
+data class ITunesResponse(
+    val resultCount: Int,
+    val results: List<ITunesTrack>
+)
 
 object MusicApi {
-    private val httpClient = HttpClient {
-        install(ContentNegotiation) {
-            json(Json { ignoreUnknownKeys = true })
-        }
-    }
+    private val httpClient = HttpClient()
 
     // Mock data for testing when API fails
     private val mockTracks = listOf(
-        Track("1", "Blinding Lights", "The Weeknd"),
-        Track("2", "Shape of You", "Ed Sheeran"),
-        Track("3", "Bohemian Rhapsody", "Queen"),
-        Track("4", "Imagine", "John Lennon"),
-        Track("5", "Hotel California", "Eagles"),
-        Track("6", "Stairway to Heaven", "Led Zeppelin"),
-        Track("7", "Billie Jean", "Michael Jackson"),
-        Track("8", "Yesterday", "The Beatles"),
-        Track("9", "Smells Like Teen Spirit", "Nirvana"),
-        Track("10", "Like a Rolling Stone", "Bob Dylan"),
-        Track("11", "What's Going On", "Marvin Gaye"),
-        Track("12", "Respect", "Aretha Franklin"),
-        Track("13", "Good Vibrations", "The Beach Boys"),
-        Track("14", "Johnny B. Goode", "Chuck Berry"),
-        Track("15", "Hey Jude", "The Beatles")
+        Track("1", "Blinding Lights", "The Weeknd", "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview115/v4/a1/6c/7a/a16c7a6e-4e0e-e4d7-7f7b-7b7b7b7b7b7b/mzaf_12345678901234567890.plus.aac.p.m4a"),
+        Track("2", "Shape of You", "Ed Sheeran", "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview125/v4/b2/7d/8e/b27d8e9f-5f1f-f5e8-8f8c-8c8c8c8c8c8c/mzaf_23456789012345678901.plus.aac.p.m4a"),
+        Track("3", "Bohemian Rhapsody", "Queen", "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview135/v4/c3/8e/9f/c38e9f0a-6a2a-a6f9-9a9d-9d9d9d9d9d9d/mzaf_34567890123456789012.plus.aac.p.m4a"),
+        Track("4", "Imagine", "John Lennon", "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview145/v4/d4/9f/0a/d49f0a1b-7b3b-b7fa-aaba-babababababa/mzaf_45678901234567890123.plus.aac.p.m4a"),
+        Track("5", "Hotel California", "Eagles", "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview155/v4/e5/a0/1b/e5a01b2c-8c4c-c8fb-bbcb-cbcbcbcbcbcb/mzaf_56789012345678901234.plus.aac.p.m4a")
     )
 
     suspend fun searchSongs(query: String): List<Track> {
         return try {
-            val deezerUrl = "https://api.deezer.com/search?q=${query.replace(" ", "%20")}"
-            println("Searching: $deezerUrl") // Debug log
+            val itunesUrl = "https://itunes.apple.com/search?term=${query.replace(" ", "%20")}&media=music&entity=song&limit=20"
+            println("Searching iTunes API: $itunesUrl")
             
-            val response: DeezerResponse = httpClient.get(deezerUrl).body()
-            val tracks = response.data.map {
-                Track(it.id.toString(), it.title, it.artist.name)
+            val response = httpClient.get(itunesUrl) {
+                headers {
+                    append("Accept", "application/json")
+                    append("User-Agent", "TuneBridge/1.0")
+                }
             }
             
-            println("API returned ${tracks.size} tracks") // Debug log
+            val responseText = response.bodyAsText()
+            println("Raw response: ${responseText.take(200)}...")
+            
+            val json = Json { ignoreUnknownKeys = true }
+            val itunesResponse = json.decodeFromString<ITunesResponse>(responseText)
+            
+            val tracks = itunesResponse.results.mapNotNull { track ->
+                if (track.previewUrl.isNotEmpty()) {
+                    Track(
+                        id = track.trackId.toString(),
+                        title = track.trackName,
+                        artist = track.artistName,
+                        previewUrl = track.previewUrl
+                    )
+                } else null
+            }
+            
+            println("iTunes API returned ${tracks.size} tracks with previews")
             
             if (tracks.isEmpty()) {
-                // Return filtered mock data if API returns empty
+                println("No tracks with previews found, using mock data")
                 getMockResults(query)
             } else {
                 tracks
             }
         } catch (e: Exception) {
-            println("API Error: ${e.message}") // Debug log
-            // Return mock data on API error
+            println("API Error: ${e.message}")
+            println("Falling back to mock data")
             getMockResults(query)
         }
     }
@@ -77,10 +96,3 @@ object MusicApi {
         }
     }
 }
-
-@Serializable
-data class DeezerResponse(val data: List<DeezerTrack>)
-@Serializable
-data class DeezerTrack(val id: Int, val title: String, val artist: DeezerArtist)
-@Serializable
-data class DeezerArtist(val name: String)

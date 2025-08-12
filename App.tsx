@@ -5,23 +5,44 @@ import {
   StyleSheet, 
   StatusBar,
   TouchableOpacity,
-  NativeModules
+  NativeModules,
+  Text as RNText
 } from 'react-native';
 import { 
   TextInput, 
-  Button, 
-  Card, 
   Text, 
   Snackbar, 
-  IconButton,
   ProgressBar,
-  Surface,
   Provider as PaperProvider,
-  DefaultTheme
+  MD3LightTheme
 } from 'react-native-paper';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 const { MusicNativeModule } = NativeModules;
+
+// Simple Icon component using emojis and symbols
+const Icon = ({ name, size = 20, color = '#000000', style = {} }) => {
+  const iconMap = {
+    'magnify': '🔍',
+    'close': '✕',
+    'play': '▶️',
+    'pause': '⏸️',
+    'shuffle': '🔀',
+    'skip-previous': '⏮️',
+    'skip-next': '⏭️',
+    'repeat': '🔁',
+    'volume-low': '🔉',
+    'volume-high': '🔊',
+    'devices': '📱',
+    'playlist-music': '📝'
+  };
+  
+  return (
+    <RNText style={[{ fontSize: size, color }, style]}>
+      {iconMap[name] || '❓'}
+    </RNText>
+  );
+};
 
 type Track = {
   id: string;
@@ -118,68 +139,90 @@ function AppContent() {
   };
 
   const renderTrack = ({ item }: { item: Track }) => (
-    <Card style={styles.trackCard} mode="elevated">
-      <TouchableOpacity onPress={() => playTrack(item)}>
-        <Card.Content style={styles.trackContent}>
-          <View style={styles.trackInfo}>
-            <Text variant="titleMedium" style={styles.trackTitle} numberOfLines={1}>
-              {item.title}
-            </Text>
-            <Text variant="bodyMedium" style={styles.artistText} numberOfLines={1}>
-              {item.artist}
-            </Text>
-          </View>
-          <IconButton 
-            icon="play" 
-            size={24} 
-            iconColor="#6200ea"
-            onPress={() => playTrack(item)}
-          />
-        </Card.Content>
+    <TouchableOpacity 
+      style={styles.trackItem} 
+      onPress={() => playTrack(item)}
+      activeOpacity={0.7}
+    >
+      <View style={styles.trackLeft}>
+        <View style={styles.albumArtSmall}>
+          <RNText style={styles.albumArtSmallIcon}>🎵</RNText>
+        </View>
+        <View style={styles.trackInfo}>
+          <Text style={styles.trackTitle} numberOfLines={1}>
+            {item.title}
+          </Text>
+          <Text style={styles.artistText} numberOfLines={1}>
+            {item.artist}
+          </Text>
+        </View>
+      </View>
+      <TouchableOpacity 
+        style={styles.playButtonSmall}
+        onPress={() => playTrack(item)}
+      >
+        <Icon 
+          name={currentTrack?.id === item.id && playerStatus.isPlaying ? "pause" : "play"} 
+          size={20} 
+          color="#007AFF"
+        />
       </TouchableOpacity>
-    </Card>
+    </TouchableOpacity>
   );
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#6200ea" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       
       {/* Header */}
-      <Surface style={styles.header} elevation={4}>
-        <Text variant="headlineMedium" style={styles.headerTitle}>
-          🎵 TuneBridge
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>
+          TuneBridge
         </Text>
-        <Text variant="bodyMedium" style={styles.headerSubtitle}>
-          Your music, everywhere
+        <Text style={styles.headerSubtitle}>
+          Discover your favorite music
         </Text>
-      </Surface>
+      </View>
 
       {/* Search Section */}
       <View style={styles.searchSection}>
-        <TextInput
-          label="Search for songs or artists"
-          mode="outlined"
-          value={query}
-          onChangeText={setQuery}
-          style={styles.searchInput}
-          returnKeyType="search"
-          onSubmitEditing={search}
-          left={<TextInput.Icon icon="magnify" />}
-          outlineColor="#6200ea"
-          activeOutlineColor="#6200ea"
-        />
+        <View style={styles.searchContainer}>
+          <View style={styles.searchIcon}>
+            <Icon 
+              name="magnify" 
+              size={20} 
+              color="#666666" 
+            />
+          </View>
+          <TextInput
+            placeholder="Search songs, artists..."
+            placeholderTextColor="#999999"
+            value={query}
+            onChangeText={setQuery}
+            style={styles.searchInput}
+            returnKeyType="search"
+            onSubmitEditing={search}
+          />
+          {query.length > 0 && (
+            <TouchableOpacity onPress={() => setQuery('')}>
+              <Icon 
+                name="close" 
+                size={20} 
+                color="#999999" 
+              />
+            </TouchableOpacity>
+          )}
+        </View>
         
-        <Button
-          mode="contained"
-          onPress={search}
-          loading={loading}
-          disabled={loading}
-          style={styles.searchButton}
-          buttonColor="#6200ea"
-          contentStyle={styles.searchButtonContent}
-        >
-          {loading ? 'Searching...' : 'Search'}
-        </Button>
+        {loading && (
+          <View style={styles.loadingContainer}>
+            <ProgressBar 
+              indeterminate 
+              color="#007AFF" 
+              style={styles.loadingBar}
+            />
+          </View>
+        )}
       </View>
 
       {/* Results List */}
@@ -187,17 +230,29 @@ function AppContent() {
         data={tracks}
         keyExtractor={(item) => item.id}
         renderItem={renderTrack}
-        contentContainerStyle={styles.listContainer}
+        contentContainerStyle={[
+          styles.listContainer,
+          showPlayer && styles.listContainerWithPlayer
+        ]}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           !loading && tracks.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyIcon}>🎼</Text>
+              <RNText style={styles.emptyIcon}>🎼</RNText>
               <Text style={styles.emptyText}>
-                {query ? 'No songs found' : 'Search for your favorite music'}
+                {query ? 'No songs found' : 'Start searching for music'}
               </Text>
               <Text style={styles.emptySubtext}>
-                {query ? 'Try a different search term' : 'Discover millions of songs'}
+                {query ? 'Try a different search term' : 'Find your favorite songs and artists'}
+              </Text>
+            </View>
+          ) : null
+        }
+        ListHeaderComponent={
+          tracks.length > 0 ? (
+            <View style={styles.resultsHeader}>
+              <Text style={styles.resultsText}>
+                Found {tracks.length} songs
               </Text>
             </View>
           ) : null
@@ -206,15 +261,24 @@ function AppContent() {
 
       {/* Music Player */}
       {showPlayer && currentTrack && (
-        <Surface style={styles.playerContainer} elevation={4}>
-          <View style={styles.playerGradient}>
-            {/* Now Playing Info */}
-            <View style={styles.nowPlayingInfo}>
-              <View style={styles.albumArt}>
-                <Text style={styles.albumArtIcon}>🎵</Text>
+        <View style={styles.playerContainer}>
+          <View style={styles.playerContent}>
+            {/* Collapse Button */}
+            <TouchableOpacity 
+              style={styles.collapseButton}
+              onPress={() => setShowPlayer(false)}
+            >
+              <View style={styles.collapseHandle} />
+            </TouchableOpacity>
+
+            {/* Album Art & Track Info */}
+            <View style={styles.trackSection}>
+              <View style={styles.albumArtLarge}>
+                <RNText style={styles.albumArtLargeIcon}>🎵</RNText>
               </View>
-              <View style={styles.trackDetails}>
-                <Text style={styles.nowPlayingTitle} numberOfLines={1}>
+              
+              <View style={styles.trackDetailsLarge}>
+                <Text style={styles.nowPlayingTitle} numberOfLines={2}>
                   {currentTrack.title}
                 </Text>
                 <Text style={styles.nowPlayingArtist} numberOfLines={1}>
@@ -223,65 +287,112 @@ function AppContent() {
               </View>
             </View>
 
-            {/* Progress Bar */}
-            <ProgressBar 
-              progress={0.3} 
-              color="#ffffff" 
-              style={styles.progressBar}
-            />
+            {/* Progress Section */}
+            <View style={styles.progressSection}>
+              <View style={styles.progressContainer}>
+                <Text style={styles.timeText}>0:00</Text>
+                <ProgressBar 
+                  progress={0.3} 
+                  color="#007AFF" 
+                  style={styles.progressBar}
+                />
+                <Text style={styles.timeText}>0:30</Text>
+              </View>
+            </View>
 
-            {/* Player Controls */}
-            <View style={styles.playerControls}>
-              <IconButton
-                icon="volume-minus"
-                size={28}
-                iconColor="#ffffff"
-                onPress={() => adjustVolume(false)}
-              />
+            {/* Main Controls */}
+            <View style={styles.controlsSection}>
+              <TouchableOpacity style={styles.controlButton}>
+                <Icon
+                  name="shuffle"
+                  size={24}
+                  color="#666666"
+                />
+              </TouchableOpacity>
               
-              <View style={styles.mainControls}>
-                <IconButton
-                  icon="skip-previous"
+              <TouchableOpacity style={styles.controlButton}>
+                <Icon
+                  name="skip-previous"
                   size={32}
-                  iconColor="#ffffff"
+                  color="#333333"
                 />
-                
-                <IconButton
-                  icon={playerStatus.isPlaying ? "pause" : "play"}
-                  size={48}
-                  iconColor="#ffffff"
-                  style={styles.playButton}
-                  onPress={togglePlay}
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.playButtonLarge}
+                onPress={togglePlay}
+              >
+                <Icon
+                  name={playerStatus.isPlaying ? "pause" : "play"}
+                  size={36}
+                  color="#FFFFFF"
                 />
-                
-                <IconButton
-                  icon="skip-next"
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.controlButton}>
+                <Icon
+                  name="skip-next"
                   size={32}
-                  iconColor="#ffffff"
+                  color="#333333"
+                />
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.controlButton}>
+                <Icon
+                  name="repeat"
+                  size={24}
+                  color="#666666"
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* Volume Controls */}
+            <View style={styles.volumeSection}>
+              <TouchableOpacity onPress={() => adjustVolume(false)}>
+                <Icon
+                  name="volume-low"
+                  size={20}
+                  color="#666666"
+                />
+              </TouchableOpacity>
+              
+              <View style={styles.volumeSliderContainer}>
+                <ProgressBar 
+                  progress={playerStatus.volume / 10} 
+                  color="#007AFF" 
+                  style={styles.volumeSlider}
                 />
               </View>
-
-              <IconButton
-                icon="volume-plus"
-                size={28}
-                iconColor="#ffffff"
-                onPress={() => adjustVolume(true)}
-              />
+              
+              <TouchableOpacity onPress={() => adjustVolume(true)}>
+                <Icon
+                  name="volume-high"
+                  size={20}
+                  color="#666666"
+                />
+              </TouchableOpacity>
             </View>
 
-            {/* Volume Indicator */}
-            <View style={styles.volumeContainer}>
-              <Text style={styles.volumeText}>
-                Volume: {playerStatus.volume}/10
-              </Text>
-              <ProgressBar 
-                progress={playerStatus.volume / 10} 
-                color="#ffffff" 
-                style={styles.volumeBar}
-              />
+            {/* Additional Controls */}
+            <View style={styles.bottomControls}>
+              <TouchableOpacity style={styles.bottomControlButton}>
+                <Icon
+                  name="devices"
+                  size={20}
+                  color="#666666"
+                />
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.bottomControlButton}>
+                <Icon
+                  name="playlist-music"
+                  size={20}
+                  color="#666666"
+                />
+              </TouchableOpacity>
             </View>
           </View>
-        </Surface>
+        </View>
       )}
 
       {/* Snackbar for errors */}
@@ -300,77 +411,135 @@ function AppContent() {
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: '#f5f5f5' 
+    backgroundColor: '#FFFFFF' 
   },
   header: {
-    backgroundColor: '#6200ea',
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 24,
+    paddingHorizontal: 24,
+    paddingTop: 60,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
   headerTitle: {
-    color: '#ffffff',
+    color: '#000000',
+    fontSize: 32,
     fontWeight: 'bold',
-    textAlign: 'center',
+    marginBottom: 4,
   },
   headerSubtitle: {
-    color: '#ffffff',
-    textAlign: 'center',
-    marginTop: 4,
-    opacity: 0.9,
+    color: '#666666',
+    fontSize: 16,
   },
   searchSection: {
-    padding: 16,
-    backgroundColor: '#ffffff',
-    marginHorizontal: 8,
-    marginTop: -16,
-    borderRadius: 16,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: '#FFFFFF',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F8F8',
+    borderRadius: 24,
+    paddingHorizontal: 4,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+  },
+  searchIcon: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   searchInput: {
-    marginBottom: 16,
-    backgroundColor: '#ffffff',
+    flex: 1,
+    color: '#000000',
+    fontSize: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    backgroundColor: 'transparent',
   },
-  searchButton: {
-    borderRadius: 12,
+  loadingContainer: {
+    marginTop: 8,
   },
-  searchButtonContent: {
-    paddingVertical: 8,
+  loadingBar: {
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: 'transparent',
   },
   listContainer: { 
-    padding: 16,
-    paddingTop: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
-  trackCard: { 
-    marginBottom: 12,
-    borderRadius: 16,
-    backgroundColor: '#ffffff',
+  listContainerWithPlayer: {
+    paddingBottom: 400,
   },
-  trackContent: {
+  resultsHeader: {
+    paddingVertical: 16,
+  },
+  resultsText: {
+    color: '#333333',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  trackItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    marginVertical: 4,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  trackLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  albumArtSmall: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#F8F8F8',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  albumArtSmallIcon: {
+    fontSize: 20,
+    color: '#666666',
   },
   trackInfo: {
     flex: 1,
-    marginRight: 8,
+    marginRight: 12,
   },
   trackTitle: {
+    color: '#000000',
+    fontSize: 16,
     fontWeight: '600',
-    color: '#1a1a1a',
+    marginBottom: 2,
   },
   artistText: { 
     color: '#666666',
-    marginTop: 2,
+    fontSize: 14,
+  },
+  playButtonSmall: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 60,
+    paddingVertical: 80,
   },
   emptyIcon: {
     fontSize: 64,
@@ -378,106 +547,176 @@ const styles = StyleSheet.create({
   },
   emptyText: { 
     fontSize: 18,
-    color: '#666666',
+    color: '#333333',
     textAlign: 'center',
     fontWeight: '600',
+    marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#999999',
+    color: '#666666',
     textAlign: 'center',
-    marginTop: 8,
   },
+  // Player Styles
   playerContainer: {
     position: 'absolute',
-    bottom: 0,
+    top: 0,
     left: 0,
     right: 0,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    overflow: 'hidden',
+    bottom: 0,
+    backgroundColor: '#FFFFFF',
+    zIndex: 1000,
   },
-  playerGradient: {
-    padding: 20,
-    paddingBottom: 30,
-    backgroundColor: '#6200ea',
+  playerContent: {
+    flex: 1,
+    paddingTop: 40,
+    paddingHorizontal: 24,
   },
-  nowPlayingInfo: {
-    flexDirection: 'row',
+  collapseButton: {
     alignItems: 'center',
-    marginBottom: 16,
+    paddingVertical: 12,
   },
-  albumArt: {
-    width: 60,
-    height: 60,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+  collapseHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: '#E5E5E5',
+    borderRadius: 2,
+  },
+  trackSection: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  albumArtLarge: {
+    width: 280,
+    height: 280,
+    borderRadius: 20,
+    backgroundColor: '#F8F8F8',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginBottom: 32,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 8,
   },
-  albumArtIcon: {
-    fontSize: 24,
-    color: '#ffffff',
+  albumArtLargeIcon: {
+    fontSize: 80,
+    color: '#666666',
   },
-  trackDetails: {
-    flex: 1,
+  trackDetailsLarge: {
+    alignItems: 'center',
+    width: '100%',
   },
   nowPlayingTitle: {
-    color: '#ffffff',
-    fontSize: 18,
+    color: '#000000',
+    fontSize: 24,
     fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 8,
   },
   nowPlayingArtist: {
-    color: '#ffffff',
-    fontSize: 14,
-    opacity: 0.8,
-    marginTop: 2,
+    color: '#666666',
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  progressSection: {
+    paddingVertical: 24,
+  },
+  progressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  timeText: {
+    color: '#666666',
+    fontSize: 12,
+    width: 40,
+    textAlign: 'center',
   },
   progressBar: {
+    flex: 1,
     height: 4,
     borderRadius: 2,
-    marginBottom: 20,
-    backgroundColor: 'rgba(255,255,255,0.3)',
+    marginHorizontal: 12,
+    backgroundColor: '#E5E5E5',
   },
-  playerControls: {
+  controlsSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
+    justifyContent: 'center',
+    paddingVertical: 24,
   },
-  mainControls: {
+  controlButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 12,
+  },
+  playButtonLarge: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 20,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  volumeSection: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 8,
   },
-  playButton: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
+  volumeSliderContainer: {
+    flex: 1,
     marginHorizontal: 8,
   },
-  volumeContainer: {
+  volumeSlider: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E5E5E5',
+  },
+  bottomControls: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
   },
-  volumeText: {
-    color: '#ffffff',
-    fontSize: 12,
-    marginBottom: 8,
-    opacity: 0.8,
-  },
-  volumeBar: {
-    width: 200,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: 'rgba(255,255,255,0.3)',
+  bottomControlButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   snackbar: {
     marginBottom: 16,
+    backgroundColor: '#007AFF',
   },
 });
 
 export default function App() {
+  const lightTheme = {
+    ...MD3LightTheme,
+    colors: {
+      ...MD3LightTheme.colors,
+      primary: '#007AFF',
+      surface: '#FFFFFF',
+      background: '#FFFFFF',
+    },
+  };
+
   return (
     <SafeAreaProvider>
-      <PaperProvider theme={DefaultTheme}>
+      <PaperProvider theme={lightTheme}>
         <AppContent />
       </PaperProvider>
     </SafeAreaProvider>
